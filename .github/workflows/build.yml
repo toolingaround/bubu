@@ -3,7 +3,7 @@ name: Build aapt2
 on:
   push:
     branches:
-      - main
+      - master
       - dev
   workflow_dispatch:
     inputs:
