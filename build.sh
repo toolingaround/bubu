@@ -16,6 +16,9 @@ libtool \
 build-essential \
 -y || exit 1
 
+mkdir src
+git submodule init
+git submodule update --depth 1
 root="$(pwd)"
 
 # Install protobuf compiler.
