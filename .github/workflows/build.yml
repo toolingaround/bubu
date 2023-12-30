@@ -21,18 +21,6 @@ jobs:
         target_arch: [x86_64, x86, arm64-v8a, armeabi-v7a]
       fail-fast: false
     steps:
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@master
-        with:
-          root-reserve-mb: 512
-          swap-size-mb: 1024
-          remove-dotnet: 'true'
-
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
       - name: Checkout
         uses: actions/checkout@v3
         with:
