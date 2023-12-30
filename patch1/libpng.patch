@@ -1,0 +1,28 @@
+diff --git a/libpng/CMakeLists.txt b/libpng/CMakeLists.txt
+index e355e4d..6d498f8 100644
+--- a/libpng/CMakeLists.txt
++++ b/libpng/CMakeLists.txt
+@@ -76,20 +76,20 @@ option(PNG_HARDWARE_OPTIMIZATIONS "Enable hardware optimizations" ON)
+ 
+ # Allow the users to specify a location of zlib.
+ # Useful if zlib is being built alongside this as a sub-project.
+-option(PNG_BUILD_ZLIB "Custom zlib location, else find_package is used" OFF)
++option(PNG_BUILD_ZLIB "Custom zlib location, else find_package is used" ON)
+ if(NOT PNG_BUILD_ZLIB)
+   find_package(ZLIB REQUIRED)
+   include_directories(${ZLIB_INCLUDE_DIRS})
+ endif()
+ 
+-if(UNIX AND NOT APPLE AND NOT BEOS AND NOT HAIKU AND NOT EMSCRIPTEN)
++if(UNIX AND NOT APPLE AND NOT BEOS AND NOT HAIKU AND NOT EMSCRIPTEN AND NOT ANDROID)
+   find_library(M_LIBRARY m)
+   if(NOT M_LIBRARY)
+     set(M_LIBRARY "")
+   endif()
+ else()
+   # libm is not needed and/or not available.
+-  set(M_LIBRARY "")
++  set(M_LIBRARY "m")
+ endif()
+ 
+ # CMake currently sets CMAKE_SYSTEM_PROCESSOR to one of x86_64 or arm64 on macOS,

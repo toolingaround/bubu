@@ -1,0 +1,78 @@
+diff --git a/selinux/libsepol/src/private.h b/selinux/libsepol/src/private.h
+index 1833b49..ee30371 100644
+--- a/selinux/libsepol/src/private.h
++++ b/selinux/libsepol/src/private.h
+@@ -4,7 +4,6 @@
+ 
+ #include <sepol/policydb/policydb.h>
+ 
+-
+ #ifdef __APPLE__
+ #include <sys/types.h>
+ #include <machine/endian.h>
+@@ -16,8 +15,8 @@
+ #include <errno.h>
+ 
+ #ifdef __APPLE__
+-#define __BYTE_ORDER  BYTE_ORDER
+-#define __LITTLE_ENDIAN  LITTLE_ENDIAN
++#define __BYTE_ORDER BYTE_ORDER
++#define __LITTLE_ENDIAN LITTLE_ENDIAN
+ #endif
+ 
+ #if __BYTE_ORDER == __LITTLE_ENDIAN
+@@ -37,17 +36,17 @@
+ #endif
+ 
+ #undef min
+-#define min(a,b) (((a) < (b)) ? (a) : (b))
++#define min(a, b) (((a) < (b)) ? (a) : (b))
+ 
+ #undef max
+-#define max(a,b) ((a) >= (b) ? (a) : (b))
++#define max(a, b) ((a) >= (b) ? (a) : (b))
+ 
+-#define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
++#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+ 
+ #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+-# define is_saturated(x) (x == (typeof(x))-1 || (x) > (1U << 16))
++#define is_saturated(x) (x == (typeof(x))-1 || (x) > (1U << 16))
+ #else
+-# define is_saturated(x) (x == (typeof(x))-1)
++#define is_saturated(x) (x == (typeof(x))-1)
+ #endif
+ 
+ #define zero_or_saturated(x) ((x == 0) || is_saturated(x))
+@@ -57,16 +56,17 @@
+ /* Use to ignore intentional unsigned under- and overflows while running under UBSAN. */
+ #if defined(__clang__) && defined(__clang_major__) && (__clang_major__ >= 4)
+ #if (__clang_major__ >= 12)
+-#define ignore_unsigned_overflow_        __attribute__((no_sanitize("unsigned-integer-overflow", "unsigned-shift-base")))
++#define ignore_unsigned_overflow_ __attribute__((no_sanitize("unsigned-integer-overflow", "unsigned-shift-base")))
+ #else
+-#define ignore_unsigned_overflow_        __attribute__((no_sanitize("unsigned-integer-overflow")))
++#define ignore_unsigned_overflow_ __attribute__((no_sanitize("unsigned-integer-overflow")))
+ #endif
+ #else
+ #define ignore_unsigned_overflow_
+ #endif
+ 
+ /* Policy compatibility information. */
+-struct policydb_compat_info {
++struct policydb_compat_info
++{
+ 	unsigned int type;
+ 	unsigned int version;
+ 	unsigned int sym_num;
+@@ -75,8 +75,8 @@ struct policydb_compat_info {
+ };
+ 
+ extern const struct policydb_compat_info *policydb_lookup_compat(unsigned int version,
+-								 unsigned int type,
+-								 unsigned int target_platform);
++																 unsigned int type,
++																 unsigned int target_platform);
+ 
+ /* Reading from a policy "file". */
+ extern int next_entry(void *buf, struct policy_file *fp, size_t bytes);

@@ -1,0 +1,13 @@
+diff --git a/base/libs/androidfw/ResourceTypes.cpp b/base/libs/androidfw/ResourceTypes.cpp
+index c13827f..61c89e7 100644
+--- a/base/libs/androidfw/ResourceTypes.cpp
++++ b/base/libs/androidfw/ResourceTypes.cpp
+@@ -45,7 +45,7 @@
+ #include <utils/String16.h>
+ #include <utils/String8.h>
+ 
+-#ifdef __ANDROID__
++#if 0
+ #include <binder/TextOutput.h>
+ 
+ #endif

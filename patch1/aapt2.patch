@@ -1,0 +1,173 @@
+diff --git a/base/tools/aapt2/ResourceTable.cpp b/base/tools/aapt2/ResourceTable.cpp
+index a3b0b45..3978f40 100644
+--- a/base/tools/aapt2/ResourceTable.cpp
++++ b/base/tools/aapt2/ResourceTable.cpp
+@@ -470,9 +470,7 @@ bool ResourceTable::AddResource(NewResource&& res, android::IDiagnostics* diag)
+   const bool validate = validation_ == Validation::kEnabled;
+   const android::Source source = res.value ? res.value->GetSource() : android::Source{};
+   if (validate && !res.allow_mangled && !IsValidResourceEntryName(res.name.entry)) {
+-    diag->Error(android::DiagMessage(source)
+-                << "resource '" << res.name << "' has invalid entry name '" << res.name.entry);
+-    return false;
++    return true;
+   }
+ 
+   if (res.id.has_value() && !res.id->first.is_valid()) {
+diff --git a/base/tools/aapt2/ResourceUtils.cpp b/base/tools/aapt2/ResourceUtils.cpp
+index 5a118a9..e56a2dd 100644
+--- a/base/tools/aapt2/ResourceUtils.cpp
++++ b/base/tools/aapt2/ResourceUtils.cpp
+@@ -217,7 +217,7 @@ bool ParseAttributeReference(StringPiece str, ResourceNameRef* out_ref) {
+     }
+ 
+     if (!type.empty() && type != "attr") {
+-      return false;
++      // Apktool: Don't die out if private resource.
+     }
+ 
+     if (entry.empty()) {
+diff --git a/base/tools/aapt2/Resources.proto b/base/tools/aapt2/Resources.proto
+index 1d7fd1d..e6861d4 100644
+--- a/base/tools/aapt2/Resources.proto
++++ b/base/tools/aapt2/Resources.proto
+@@ -16,7 +16,7 @@
+ 
+ syntax = "proto3";
+ 
+-import "frameworks/base/tools/aapt2/Configuration.proto";
++import "Configuration.proto";
+ 
+ package aapt.pb;
+ 
+diff --git a/base/tools/aapt2/ResourcesInternal.proto b/base/tools/aapt2/ResourcesInternal.proto
+index b0ed3da..97aa5af 100644
+--- a/base/tools/aapt2/ResourcesInternal.proto
++++ b/base/tools/aapt2/ResourcesInternal.proto
+@@ -16,8 +16,8 @@
+ 
+ syntax = "proto3";
+ 
+-import "frameworks/base/tools/aapt2/Configuration.proto";
+-import "frameworks/base/tools/aapt2/Resources.proto";
++import "Configuration.proto";
++import "Resources.proto";
+ 
+ package aapt.pb.internal;
+ 
+diff --git a/base/tools/aapt2/cmd/Link.cpp b/base/tools/aapt2/cmd/Link.cpp
+index cf4dd79..569ed12 100644
+--- a/base/tools/aapt2/cmd/Link.cpp
++++ b/base/tools/aapt2/cmd/Link.cpp
+@@ -2461,9 +2461,9 @@ int LinkCommand::Action(const std::vector<std::string>& args) {
+     if (package_id_int > std::numeric_limits<uint8_t>::max()
+         || package_id_int == kFrameworkPackageId
+         || (!options_.allow_reserved_package_id && package_id_int < kAppPackageId)) {
+-      context.GetDiagnostics()->Error(
++      context.GetDiagnostics()->Warn(
+           android::DiagMessage() << StringPrintf(
+-              "invalid package ID 0x%02x. Must be in the range 0x7f-0xff.", package_id_int));
++              "invalid package ID 0x%02x. Must be in the range 0x7f-0xff. Ignoring...", package_id_int));
+       return 1;
+     }
+     context.SetPackageId(static_cast<uint8_t>(package_id_int));
+@@ -2567,6 +2567,23 @@ int LinkCommand::Action(const std::vector<std::string>& args) {
+       ".mpg", ".mpeg", ".mp4", ".m4a", ".m4v", ".3gp", ".3gpp", ".3g2", ".3gpp2", ".wma", ".wmv",
+       ".webm", ".mkv"});
+ 
++  // Populate no compress extensions specified in the extensions file.
++  if (options_.extensions_to_not_compress_path) {
++    std::ifstream extensionsFile(options_.extensions_to_not_compress_path.value());
++
++    if (extensionsFile.fail()) {
++      context.GetDiagnostics()->Error(
++        android::DiagMessage() << "could not open extensions file "
++          << options_.extensions_to_not_compress_path.value()
++          << " for reading");
++      return 1;
++    }
++
++    for (std::string line; getline(extensionsFile, line);) {
++      options_.extensions_to_not_compress.insert(line);
++    }
++  }
++
+   // Turn off auto versioning for static-libs.
+   if (context.GetPackageType() == PackageType::kStaticLib) {
+     options_.no_auto_version = true;
+diff --git a/base/tools/aapt2/cmd/Link.h b/base/tools/aapt2/cmd/Link.h
+index 26713fd..9796253 100644
+--- a/base/tools/aapt2/cmd/Link.h
++++ b/base/tools/aapt2/cmd/Link.h
+@@ -78,6 +78,7 @@ struct LinkOptions {
+   bool use_sparse_encoding = false;
+   std::unordered_set<std::string> extensions_to_not_compress;
+   std::optional<std::regex> regex_to_not_compress;
++  std::optional<std::string> extensions_to_not_compress_path;
+   FeatureFlagValues feature_flag_values;
+ 
+   // Static lib options.
+@@ -291,6 +292,8 @@ class LinkCommand : public Command {
+                     &options_.manifest_fixer_options.rename_overlay_category);
+     AddOptionalFlagList("-0", "File suffix not to compress.",
+         &options_.extensions_to_not_compress);
++    AddOptionalFlag("-e", "File containing list of extensions not to compress.",
++        &options_.extensions_to_not_compress_path);
+     AddOptionalSwitch("--no-compress", "Do not compress any resources.",
+         &options_.do_not_compress_anything);
+     AddOptionalSwitch("--keep-raw-values", "Preserve raw attribute values in xml files.",
+diff --git a/base/tools/aapt2/java/JavaClassGenerator.cpp b/base/tools/aapt2/java/JavaClassGenerator.cpp
+index 7665d0e..692c442 100644
+--- a/base/tools/aapt2/java/JavaClassGenerator.cpp
++++ b/base/tools/aapt2/java/JavaClassGenerator.cpp
+@@ -58,6 +58,8 @@ static const std::set<StringPiece> sJavaIdentifiers = {
+     "true",       "false",        "null"};
+ 
+ static bool IsValidSymbol(StringPiece symbol) {
++  // Apktool: Everything is a valid symbol
++  return true;
+   return sJavaIdentifiers.find(symbol) == sJavaIdentifiers.end();
+ }
+ 
+diff --git a/base/tools/aapt2/link/PrivateAttributeMover.cpp b/base/tools/aapt2/link/PrivateAttributeMover.cpp
+index 8c6c743..7a6d8ff 100644
+--- a/base/tools/aapt2/link/PrivateAttributeMover.cpp
++++ b/base/tools/aapt2/link/PrivateAttributeMover.cpp
+@@ -82,7 +82,6 @@ bool PrivateAttributeMover::Consume(IAaptContext* context, ResourceTable* table)
+ 
+     auto attr_private_type = ResourceNamedTypeWithDefaultName(ResourceType::kAttrPrivate);
+     ResourceTableType* priv_attr_type = package->FindOrCreateType(attr_private_type);
+-    CHECK(priv_attr_type->entries.empty());
+     priv_attr_type->entries = std::move(private_attr_entries);
+   }
+   return true;
+diff --git a/base/tools/aapt2/util/Util.cpp b/base/tools/aapt2/util/Util.cpp
+index be87766..21d0c7f 100644
+--- a/base/tools/aapt2/util/Util.cpp
++++ b/base/tools/aapt2/util/Util.cpp
+@@ -26,7 +26,6 @@
+ #include "androidfw/BigBuffer.h"
+ #include "androidfw/StringPiece.h"
+ #include "androidfw/Util.h"
+-#include "build/version.h"
+ #include "text/Unicode.h"
+ #include "text/Utf8Iterator.h"
+ #include "utils/Unicode.h"
+@@ -228,17 +227,7 @@ std::string GetToolFingerprint() {
+   // Update minor version whenever a feature or flag is added.
+   static const char* const sMinorVersion = "19";
+ 
+-  // The build id of aapt2 binary.
+-  static std::string sBuildId = android::build::GetBuildNumber();
+-
+-  if (android::base::StartsWith(sBuildId, "eng.")) {
+-    time_t now = time(0);
+-    tm* ltm = localtime(&now);
+-
+-    sBuildId = android::base::StringPrintf("eng.%d%d", 1900 + ltm->tm_year, 1 + ltm->tm_mon);
+-  }
+-
+-  return android::base::StringPrintf("%s.%s-%s", sMajorVersion, sMinorVersion, sBuildId.c_str());
++  return android::base::StringPrintf("%s.%s", sMajorVersion, sMinorVersion);
+ }
+ 
+ static size_t ConsumeDigits(const char* start, const char* end) {
