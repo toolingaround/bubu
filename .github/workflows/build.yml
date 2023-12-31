@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target_arch: [x86_64, x86, arm64-v8a, armeabi-v7a]
+        target_arch: [x86_64]
       fail-fast: false
     steps:
       - name: Checkout
@@ -31,12 +31,7 @@ jobs:
         with:
           ndk-version: r23c
           add-to-path: false
-      - run: ./build.sh ${{ matrix.target_arch }}
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
         env:
           NDK_TOOLCHAIN: ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: dist-${{ matrix.target_arch }}
-          path: dist
